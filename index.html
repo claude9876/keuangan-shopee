@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buku Kas Toko Shopee</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root{--bg:#eef1ee;--card:#fff;--ink:#1b2a2f;--mute:#5e6e72;--line:#d5dcd8;--acc:#ee4d2d;--ok:#1f8a5b;--bad:#c0392b;--hpp:#e0a526;--out:#4b6a9b}
+@media(prefers-color-scheme:dark){:root{--bg:#121a1c;--card:#1a2528;--ink:#e8eeee;--mute:#93a3a6;--line:#2b393c;--ok:#4cc38a;--bad:#ff7b6b}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.5 "Plus Jakarta Sans",system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:16px}
+h1,h2{margin:0;font-weight:800}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:16px}
+input,select,button{font:inherit;color:inherit}
+input,select{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+button{cursor:pointer;border:1px solid var(--line);background:var(--card);padding:9px 14px;border-radius:8px;font-weight:600}
+button.p{background:var(--acc);border-color:var(--acc);color:#fff}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.hero{background:var(--ink);color:var(--bg);border-radius:14px;padding:20px}
+.hero small{opacity:.7}
+.big{font-size:clamp(30px,8vw,46px);font-weight:800;line-height:1.1;margin:4px 0 14px}
+.bar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:#ffffff22}
+.bar i{display:block;height:100%}
+.leg{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:10px;font-size:13px}
+.leg b{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px}
+.card small{color:var(--mute);display:block}
+.card strong{font-size:17px}
+.tabs{display:flex;gap:6px;margin:16px 0 10px}
+.tabs button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px}
+.form label{font-size:12px;color:var(--mute)}
+.row{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.row small{color:var(--mute)}
+.row .r{text-align:right;white-space:nowrap}
+.row button{padding:2px 8px;font-size:12px;margin-top:4px}
+.ok{color:var(--ok)}.bad{color:var(--bad)}
+.empty{color:var(--mute);padding:24px 0;text-align:center}
+.box{max-width:380px;margin:12vh auto;display:grid;gap:10px}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.on{opacity:1}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<div id="toast" role="status"></div>
+<script>
+// Isi di sini, atau biarkan kosong lalu isi lewat layar setup (disimpan di browser).
+const CFG = {
+  url: 'https://fqnmncitbdvuwhnvlxni.supabase.co',
+  key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxbm1uY2l0YmR2dXdobnZseG5pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA3OTQxMTcsImV4cCI6MjEwNjM3MDExN30.i7_qj6FeW9ZgusA1CPv89HF3c0zc51YG8m7JZ2dFWjI'
+};
+
+const $ = s => document.querySelector(s);
+const v = id => $('#' + id).value;
+const rp = n => (n < 0 ? '-Rp' : 'Rp') + Math.abs(Math.round(n || 0)).toLocaleString('id-ID');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const today = () => new Date().toLocaleDateString('sv-SE');
+const sum = (a, f) => a.reduce((s, x) => s + Number(f(x)), 0);
+const KATEGORI = ['Iklan Shopee', 'Kemasan', 'Bahan baku', 'Ongkir retur', 'Gaji', 'Lainnya'];
+
+let sb, bulan = today().slice(0, 7), tab = 'ringkasan', jual = [], keluar = [];
+
+function toast(t) { const e = $('#toast'); e.textContent = t; e.classList.add('on'); setTimeout(() => e.classList.remove('on'), 2600); }
+function saved() { try { return JSON.parse(localStorage.getItem('cfg') || 'null'); } catch (e) { return null; } }
+
+function setup() {
+  $('#app').innerHTML = `<div class="box"><h1>Hubungkan Supabase</h1>
+  <small>Ada di Supabase: Project Settings &gt; API.</small>
+  <input id="u" placeholder="Project URL (https://xxxx.supabase.co)">
+  <input id="k" placeholder="anon public key">
+  <button class="p" onclick="simpanCfg()">Simpan dan lanjut</button></div>`;
+}
+function simpanCfg() {
+  const c = { url: v('u').trim(), key: v('k').trim() };
+  if (!c.url || !c.key) return toast('Isi URL dan anon key');
+  try { localStorage.setItem('cfg', JSON.stringify(c)); } catch (e) {}
+  start();
+}
+function ganti() { try { localStorage.removeItem('cfg'); } catch (e) {} setup(); }
+
+function login() {
+  $('#app').innerHTML = `<div class="box"><h1>Buku Kas Toko</h1>
+  <input id="em" type="email" placeholder="Email" autocomplete="email">
+  <input id="pw" type="password" placeholder="Kata sandi (min. 6 karakter)" autocomplete="current-password">
+  <button class="p" onclick="auth('in')">Masuk</button>
+  <button onclick="auth('up')">Daftar akun baru</button>
+  <button onclick="ganti()">Ganti proyek Supabase</button></div>`;
+}
+async function auth(m) {
+  const cred = { email: v('em').trim(), password: v('pw') };
+  const { data, error } = m === 'in' ? await sb.auth.signInWithPassword(cred) : await sb.auth.signUp(cred);
+  if (error) return toast(error.message);
+  if (!data.session) return toast('Cek email untuk konfirmasi, lalu masuk');
+  load();
+}
+async function keluarAkun() { await sb.auth.signOut(); login(); }
+
+function start() {
+  const c = CFG.url && CFG.key ? CFG : saved();
+  if (!c) return setup();
+  sb = supabase.createClient(c.url, c.key);
+  sb.auth.getSession().then(({ data }) => data.session ? load() : login());
+}
+
+async function load() {
+  const [y, m] = bulan.split('-').map(Number);
+  const a = bulan + '-01', b = m == 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
+  const q = t => sb.from(t).select('*').gte('tanggal', a).lt('tanggal', b).order('tanggal', { ascending: false });
+  const [j, k] = await Promise.all([q('penjualan'), q('pengeluaran')]);
+  if (j.error || k.error) { toast((j.error || k.error).message); return render(); }
+  jual = j.data; keluar = k.data; render();
+}
+async function simpan(t, row) {
+  const { error } = await sb.from(t).insert(row);
+  if (error) return toast(error.message);
+  toast('Tersimpan'); load();
+}
+async function hapus(t, id) {
+  if (!confirm('Hapus data ini?')) return;
+  const { error } = await sb.from(t).delete().eq('id', id);
+  if (error) return toast(error.message);
+  toast('Terhapus'); load();
+}
+function tambahJual() {
+  const r = { tanggal: v('jt'), no_pesanan: v('jn').trim() || null, produk: v('jp').trim(), qty: +v('jq') || 1, harga_jual: +v('jh'), biaya_shopee: +v('jb') || 0, hpp: +v('jc') || 0 };
+  if (!r.produk || !r.harga_jual) return toast('Isi produk dan total harga jual');
+  simpan('penjualan', r);
+}
+function tambahKeluar() {
+  const r = { tanggal: v('kt'), kategori: v('kk'), keterangan: v('kn').trim() || null, jumlah: +v('kj') };
+  if (!r.jumlah) return toast('Isi jumlah pengeluaran');
+  simpan('pengeluaran', r);
+}
+function pilihBulan(x) { bulan = x; load(); }
+function pilihTab(t) { tab = t; render(); }
+
+function render() {
+  const omzet = sum(jual, x => x.harga_jual), fee = sum(jual, x => x.biaya_shopee), hpp = sum(jual, x => x.hpp), out = sum(keluar, x => x.jumlah);
+  const laba = omzet - fee - hpp - out, base = fee + hpp + out + Math.max(laba, 0) || 1;
+  const w = n => (n / base * 100).toFixed(2) + '%';
+  const margin = omzet ? (laba / omzet * 100).toFixed(1) : '0.0';
+  const seg = (n, c, l) => `<span><b style="background:${c}"></b>${l} ${rp(n)}</span>`;
+
+  const ringkasan = `<div class="grid">
+    <div class="card"><small>Pesanan</small><strong>${jual.length}</strong></div>
+    <div class="card"><small>Dana cair (omzet - biaya Shopee)</small><strong>${rp(omzet - fee)}</strong></div>
+    <div class="card"><small>Laba kotor</small><strong>${rp(omzet - fee - hpp)}</strong></div>
+    <div class="card"><small>Margin bersih</small><strong class="${laba < 0 ? 'bad' : 'ok'}">${margin}%</strong></div></div>`;
+
+  const fJual = `<div class="form">
+    <div><label>Tanggal</label><input id="jt" type="date" value="${today()}"></div>
+    <div><label>No. pesanan</label><input id="jn"></div>
+    <div><label>Produk</label><input id="jp"></div>
+    <div><label>Qty</label><input id="jq" type="number" value="1" min="1"></div>
+    <div><label>Total harga jual</label><input id="jh" type="number" inputmode="numeric"></div>
+    <div><label>Biaya Shopee</label><input id="jb" type="number" inputmode="numeric"></div>
+    <div><label>Total modal (HPP)</label><input id="jc" type="number" inputmode="numeric"></div>
+    <div style="align-self:end"><button class="p" style="width:100%" onclick="tambahJual()">Simpan penjualan</button></div></div>`;
+  const lJual = jual.length ? jual.map(x => {
+    const l = x.harga_jual - x.biaya_shopee - x.hpp;
+    return `<div class="row"><div>${esc(x.produk)} <small>x${x.qty}</small><br><small>${x.tanggal}${x.no_pesanan ? ' · ' + esc(x.no_pesanan) : ''}</small></div>
+    <div class="r">${rp(x.harga_jual)}<br><small class="${l < 0 ? 'bad' : 'ok'}">laba ${rp(l)}</small><br><button onclick="hapus('penjualan','${x.id}')">Hapus</button></div></div>`;
+  }).join('') : '<div class="empty">Belum ada penjualan bulan ini. Isi formulir di atas untuk mencatat pesanan pertama.</div>';
+
+  const fKeluar = `<div class="form">
+    <div><label>Tanggal</label><input id="kt" type="date" value="${today()}"></div>
+    <div><label>Kategori</label><select id="kk">${KATEGORI.map(k => `<option>${k}</option>`).join('')}</select></div>
+    <div><label>Keterangan</label><input id="kn"></div>
+    <div><label>Jumlah</label><input id="kj" type="number" inputmode="numeric"></div>
+    <div style="align-self:end"><button class="p" style="width:100%" onclick="tambahKeluar()">Simpan pengeluaran</button></div></div>`;
+  const lKeluar = keluar.length ? keluar.map(x => `<div class="row"><div>${esc(x.kategori)}<br><small>${x.tanggal}${x.keterangan ? ' · ' + esc(x.keterangan) : ''}</small></div>
+    <div class="r bad">${rp(x.jumlah)}<br><button onclick="hapus('pengeluaran','${x.id}')">Hapus</button></div></div>`).join('')
+    : '<div class="empty">Belum ada pengeluaran bulan ini. Catat biaya iklan, kemasan, atau gaji di formulir atas.</div>';
+
+  $('#app').innerHTML = `<div class="top"><h2>Buku Kas Toko</h2>
+    <div style="display:flex;gap:6px"><input type="month" value="${bulan}" onchange="pilihBulan(this.value)" aria-label="Bulan"><button onclick="keluarAkun()">Keluar</button></div></div>
+    <section class="hero"><small>Laba bersih bulan ini</small>
+    <div class="big">${rp(laba)}</div>
+    <div class="bar" aria-hidden="true"><i style="width:${w(fee)};background:var(--acc)"></i><i style="width:${w(hpp)};background:var(--hpp)"></i><i style="width:${w(out)};background:var(--out)"></i><i style="width:${w(Math.max(laba, 0))};background:var(--ok)"></i></div>
+    <div class="leg">${seg(omzet, '#fff', 'Omzet')}${seg(fee, 'var(--acc)', 'Biaya Shopee')}${seg(hpp, 'var(--hpp)', 'HPP')}${seg(out, 'var(--out)', 'Pengeluaran')}</div></section>
+    ${ringkasan}
+    <div class="tabs"><button class="${tab == 'ringkasan' ? 'on' : ''}" onclick="pilihTab('ringkasan')">Semua</button>
+    <button class="${tab == 'jual' ? 'on' : ''}" onclick="pilihTab('jual')">Penjualan</button>
+    <button class="${tab == 'keluar' ? 'on' : ''}" onclick="pilihTab('keluar')">Pengeluaran</button></div>
+    ${tab != 'keluar' ? (tab == 'jual' ? fJual : '') + '<h2 style="font-size:16px">Penjualan</h2>' + lJual : ''}
+    ${tab != 'jual' ? (tab == 'keluar' ? fKeluar : '') + '<h2 style="font-size:16px;margin-top:16px">Pengeluaran</h2>' + lKeluar : ''}`;
+}
+start();
+</script>
+</body>
+</html>
